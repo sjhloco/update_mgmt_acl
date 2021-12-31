@@ -1,0 +1,8 @@
+{% if feature == 'ospf' %}
+- show ip ospf neighbor:
+    _mode: strict
+{% for each_nbr in input_vars.nbrs %}
+    {{ each_nbr }}:
+      state: FULL
+{% endfor %}
+{% endif %}

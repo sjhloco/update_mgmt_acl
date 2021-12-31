@@ -1,0 +1,40 @@
+{# ########### Templating for desired state of OSPF neighbors ########## #}
+{% if feature == 'ospf' %}
+- show ip ospf neighbor:
+    _mode: strict
+{% for each_nbr in input_vars.nbrs %}
+    {{ each_nbr }}:
+      state: FULL
+{% endfor %}
+
+{# ########### Templating for desired state of ACLs ########## #}
+{% elif feature == 'acl' %}
+{% for each_acl in input_vars %}
+- show ip access-lists {{ each_acl.name }}:
+    _mode: strict
+{% set seq = namespace(cnt=10) %}
+{% for each_ace in each_acl.ace %}{% if each_ace.keys() | list | first != 'remark' %}
+    '{{ seq.cnt }}':
+      action: {{ each_ace.keys() | list | first }}
+      protocol: ip
+      src: {{ each_ace.values() | list | first }}
+      dst: any
+{% set seq.cnt = seq.cnt + 10 %}
+{% endif %}{% endfor %}
+{% endfor %}
+
+{# ########### Templating for desired state of port-channels ########## #}
+{% elif feature == 'po' %}
+- show etherchannel summary:
+{% for each_po in input_vars %}
+    {{ each_po.name }}:
+      status: U
+      protocol: {{ each_po.mode }}
+      members:
+{% for each_memeber in each_po.members %}
+        _mode: strict
+        {{ each_memeber }}:
+          mbr_status: P
+{% endfor %}{% endfor %}
+
+{% endif %}

@@ -1,0 +1,35 @@
+---
+ios:
+  connection_options:
+    naplam:
+      platform: cisco_ios
+    netmiko:
+      platform: ios
+    scrapli:
+      platform: cisco_iosxe
+nxos:
+  connection_options:
+    naplam:
+      platform: nxos_ssh
+    netmiko:
+      platform: cisco_nxos_ssh
+    scrapli:
+      platform: cisco_nxos
+iosxe:
+  connection_options:
+    naplam:
+      platform: ios
+    netmiko:
+      platform: cisco_iosxe
+    scrapli:
+      platform: cisco_iosxe
+wlc:
+  connection_options:
+    netmiko:
+      platform: cisco_wlc_ssh
+asa:
+  connection_options:
+    netmiko:
+      platform: cisco_asa_ssh
+ftd: {}
+unknown: {}

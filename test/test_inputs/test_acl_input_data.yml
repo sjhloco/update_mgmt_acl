@@ -1,0 +1,13 @@
+# Input variables rendered by jinja2 template to create ACLs
+acl:
+  - name: SSH_ACCESS
+    ace:
+      - { remark: MGMT Access - VLAN810 }
+      - { permit: 172.17.10.0/24 }
+      - { remark: Citrix Access }
+      - { permit: 10.10.109.10/32 }
+      - { deny: any }
+  - name: SNMP_ACCESS
+    ace:
+      - { deny: 10.10.209.11 }
+      - { permit: any }

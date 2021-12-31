@@ -1,0 +1,18 @@
+# - show etherchannel summary: None
+#     # Po2:
+#     #   status: U
+#     #   protocol: LACP
+#     #   members:
+#     #     _mode: strict
+#     #     Gi0/15:
+#     #       mbr_status: P
+#     #     _mode: strict
+#     #     Gi0/16:
+#     #       mbr_status: P
+- show ip ospf neighbor: {}
+# - show ip ospf neighbor:
+    # _mode: strict
+    # 192.168.255.1:
+    #   state: FULL
+    # 2.2.2.2:
+    #   state: FULL
