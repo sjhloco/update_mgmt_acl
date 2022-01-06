@@ -1,1 +1,7 @@
 
+[submodule "nornir_orion"]
+	path = nornir_orion
+	url = https://github.com/sjhloco/nornir_orion
+[submodule "nornir_validate"]
+	path = nornir_validate
+	url = https://github.com/sjhloco/nornir_validate
