@@ -85,8 +85,8 @@ def setup_nr_inv():
 # Fixture to add vars used by all this Class
 @pytest.fixture(scope="class")
 def load_vars():
-    global task, asa_config, acl_config
-    task = DotMap()
+    global dm_task, asa_config, acl_config
+    dm_task = DotMap()
     asa_config = [
         "ssh 172.17.10.0 255.255.255.0 MGMT\nssh host 10.10.109.10 MGMT",
         "http 172.17.10.0 255.255.255.0 MGMT\nhttp host 10.10.109.10 MGMT",
@@ -232,7 +232,7 @@ class TestFormatAcl:
             "http 172.17.10.0 255.255.255.0 MGMT",
             "http host 10.10.109.10 MGMT",
         ]
-        actual_result = nr_task.format_config(task, asa_config, asa_config)
+        actual_result = nr_task.format_config(dm_task, asa_config, asa_config)
         assert actual_result == desired_result, err_msg
 
         err_msg = "❌ format_config: Formatting of ASA config ready to apply failed"
@@ -246,11 +246,11 @@ class TestFormatAcl:
             " deny ip 10.100.108.224 0.0.0.31 any",
             " permit ip any any",
         ]
-        task.host.delete_cmd = [
+        dm_task.host.delete_cmd = [
             "no ip access-list extended TEST1",
             "no ip access-list extended TEST2",
         ]
-        actual_result = nr_task.format_config(task, acl_config, acl_config)
+        actual_result = nr_task.format_config(dm_task, acl_config, acl_config)
         assert actual_result == desired_result, err_msg
 
 

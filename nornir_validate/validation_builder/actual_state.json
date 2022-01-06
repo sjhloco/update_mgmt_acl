@@ -1,5 +1,0 @@
-{ "show etherchannel summary": { "Po3": { "members": { "Gi0/15": { "mbr_status": "D"},
-                                                       "Gi0/16": { "mbr_status": "D"}},
-                                          "protocol": "LACP",
-                                          "status": "SD"}},
-  "show ip ospf neighbor": {"192.168.255.1": {"state": "FULL"}}}

@@ -20,7 +20,7 @@ iosxe:
     naplam:
       platform: ios
     netmiko:
-      platform: cisco_iosxe
+      platform: cisco_xe
     scrapli:
       platform: cisco_iosxe
 wlc:

@@ -136,20 +136,11 @@ pytest test/test_nornir.py::TestNornirCfg -vv
 
 
 [POA]
-3. Validate
-Have created group_var acl_var as  {'groups': {'ios': {'acl': [list of acls]}
-
-All import vars must be in same format as file, so 'hosts', 'groups' or 'all'
-Question is how to use this as am using import task, see if can load, if not need to make function more generic
-3c. Add to nor-val to take data in variable format dict.
-3d. add ASA SSH and HTTP check in nor_val(what does the cmds look like? - just be show run)
-3e. Add unitests for this in nornir-val
-3f. Update nor-val readme
-
-4. Test in update mgmt_acl by unhashing line 293
+1. Test in update mgmt_acl by unhashing line 293
 Unit test adding acl_val
+-Will be an issue with nexus where it needs '' round cmd and is diff (no extended)    show run | sec 'access-list TEST_SSH_ACCESS'
 
-
+3. Update work windows setup, needs to include typing, ipdb and versions of netmiko and napalm
 
 
 Caveats
@@ -159,3 +150,5 @@ Orion sees Firepower also as ASA, not sure whow to fix thta. Would probbaly be h
 Dont use extended ACLs as the switch will rewrite thme to meet the hash, so although sequencing still correct (in terms of numbers), when you view in runnign config or show ip access-list it is displayed in a different order. Breaks checks and causes comments to be incorrect
 
 https://community.cisco.com/t5/switching/access-list-wrong-order/td-p/3070419/highlight/true/page/2
+
+On NXOS the ACLs must be entered in the format x.x.x.x/x, if you use masks or wildcards will be in the config that way and will get the wrong result form the [cisco_nxos_show_access-lists.textfsm](https://github.com/networktocode/ntc-templates/blob/master/ntc_templates/templates/cisco_nxos_show_access-lists.textfsm) NTC template,
