@@ -36,7 +36,7 @@ def nr_create_test_env_tasks(task: Task) -> Result:
     )
     vty_config = vty_config.result.splitlines()
     # Add ACLs to the switch
-    acl_config = "\n".join(acl["delete"]) + "\n" + acl["base_acl"]
+    acl_config = "\n".join(cmds["del"]) + "\n" + acl["base_acl"]
     task.run(
         name="Adding ACLs",
         task=netmiko_send_config,
@@ -59,7 +59,7 @@ def nr_delete_test_env_tasks(task: Task) -> Result:
     task.run(name="Reverting VTY", task=netmiko_send_config, config_commands=vty_config)
     # delete ACLs to the switch
     task.run(
-        name="Deleting ACLs", task=netmiko_send_config, config_commands=acl["delete"]
+        name="Deleting ACLs", task=netmiko_send_config, config_commands=cmds["del"]
     )
 
 
@@ -88,8 +88,8 @@ def load_vars():
     global dm_task, asa_config, acl_config
     dm_task = DotMap()
     asa_config = [
-        "ssh 172.17.10.0 255.255.255.0 MGMT\nssh host 10.10.109.10 MGMT",
-        "http 172.17.10.0 255.255.255.0 MGMT\nhttp host 10.10.109.10 MGMT",
+        "ssh 172.17.10.0 255.255.255.0 mgmt\nssh host 10.10.109.10 mgmt",
+        "http 172.17.10.0 255.255.255.0 mgmt\nhttp host 10.10.109.10 mgmt",
     ]
     acl_config = [
         "ip access-list extended TEST1\n remark TEST\n permit ip host 172.25.24.168 any",
@@ -100,11 +100,14 @@ def load_vars():
 # Fixture ACLs to test running the ACL commands
 @pytest.fixture(scope="class")
 def setup_test_env():
-    global nr_host
+    global nr_host, cmds
     # Filters the inventory to the one test hosts and adds host_vars
     nr_host = nr_inv.filter(name="TEST_DEVICE")
     nr_host.inventory.hosts["TEST_DEVICE"]["config"] = acl["base_acl"].split("\n\n")
-    nr_host.inventory.hosts["TEST_DEVICE"]["show_cmd"] = acl["show"]
+    # Generate the show and delet cmds
+    cmds = nr_task.show_del_cmd("ios/iosxe", acl["name"])
+
+    nr_host.inventory.hosts["TEST_DEVICE"]["show_cmd"] = cmds["show"]
     # Run the Nornir tasks to setup the environment
     result = nr_host.run(task=nr_create_test_env_tasks)
     if result.failed == True:
@@ -125,7 +128,7 @@ class TestNornirTemplate:
     def test_nr_template(self):
         err_msg = "❌ template_config: Individual Nornir template task failed"
         desired_result = (
-            "ip access-list extended UTEST_SSH_ACCESS\n"
+            "\nip access-list extended UTEST_SSH_ACCESS\n"
             " remark MGMT Access - VLAN810\n"
             " permit ip 172.17.10.0 0.0.0.255 any\n"
             " remark Citrix Access\n"
@@ -135,14 +138,11 @@ class TestNornirTemplate:
             "ip access-list extended UTEST_SNMP_ACCESS\n"
             " deny ip host 10.10.209.11 any\n"
             " permit ip any any\n"
-            "\n"
+            "\n\n"
         )
         tmp_nr_inv = nr_inv.filter(F(name=list(nr_inv.inventory.hosts.keys())[0]))
         config = tmp_nr_inv.run(
-            task=nr_task.template_config,
-            info="IOS/IOS-XE",
-            template="cfg_iosxe_acl_tmpl.j2",
-            acl=acl["wcard"],
+            task=nr_task.template_config, os_type="ios/iosxe", acl=acl["wcard"]
         )
         assert str(config[list(config.keys())[0]][1].result) == desired_result, err_msg
 
@@ -150,41 +150,60 @@ class TestNornirTemplate:
     def test_generate_acl_config(self):
         err_msg = "❌ generate_acl_config: Nornir task for {} template creation and group_var failed"
         desired_result_iosxe = [
-            "ip access-list extended UTEST_SSH_ACCESS\n remark MGMT Access - VLAN810\n permit ip 172.17.10.0 0.0.0.255 any\n remark Citrix Access\n permit ip host 10.10.109.10 any\n deny ip any any",
+            "\nip access-list extended UTEST_SSH_ACCESS\n remark MGMT Access - VLAN810\n permit ip 172.17.10.0 0.0.0.255 any\n remark Citrix Access\n permit ip host 10.10.109.10 any\n deny ip any any",
             "ip access-list extended UTEST_SNMP_ACCESS\n deny ip host 10.10.209.11 any\n permit ip any any",
         ]
         desired_result_nxos = [
-            "ip access-list extended UTEST_SSH_ACCESS\n remark MGMT Access - VLAN810\n permit ip 172.17.10.0/24 any\n remark Citrix Access\n permit ip 10.10.109.10/32 any\n deny ip any any",
-            "ip access-list extended UTEST_SNMP_ACCESS\n deny ip 10.10.209.11/32 any\n permit ip any any",
+            "ip access-list UTEST_SSH_ACCESS\n  10 remark MGMT Access - VLAN810\n  20 permit ip 172.17.10.0/24 any\n  30 remark Citrix Access\n  40 permit ip 10.10.109.10/32 any\n  50 deny ip any any",
+            "ip access-list UTEST_SNMP_ACCESS\n  10 deny ip 10.10.209.11/32 any\n  20 permit ip any any",
         ]
         desired_result_asa = [
-            "ssh 172.17.10.0 255.255.255.0 MGMT\nssh host 10.10.109.10 MGMT",
-            "http 172.17.10.0 255.255.255.0 MGMT\nhttp host 10.10.109.10 MGMT",
+            "\nssh 172.17.10.0 255.255.255.0 mgmt\nssh host 10.10.109.10 mgmt",
+            "http 172.17.10.0 255.255.255.0 mgmt\nhttp host 10.10.109.10 mgmt",
         ]
-        nr_config = nr_task.generate_acl_config(nr_inv, acl)
+        iosxe_nr = nr_inv.filter(F(groups__any=["ios", "iosxe"]))
+        nr_task.generate_acl_config(
+            iosxe_nr, "ios/iosxe", acl["name"], acl["wcard"], acl["prefix"]
+        )
+        nxos_nr = nr_inv.filter(F(groups__any=["nxos"]))
+        nr_task.generate_acl_config(
+            nxos_nr, "nxos", acl["name"], acl["prefix"], acl["prefix"]
+        )
+        asa_nr = nr_inv.filter(F(groups__any=["asa"]))
+        nr_task.generate_acl_config(
+            asa_nr, "asa", acl["name"], acl["mask"], acl["prefix"]
+        )
         assert (
-            nr_config.inventory.groups["iosxe"]["config"] == desired_result_iosxe
+            iosxe_nr.inventory.groups["ios"]["config"] == desired_result_iosxe
         ), err_msg.format("IOS-XE")
         assert (
-            nr_config.inventory.groups["ios"]["config"] == desired_result_iosxe
-        ), err_msg.format("IOS")
-        assert (
-            nr_config.inventory.groups["nxos"]["config"] == desired_result_nxos
+            nxos_nr.inventory.groups["nxos"]["config"] == desired_result_nxos
         ), err_msg.format("NXOS")
         assert (
-            nr_config.inventory.groups["asa"]["config"] == desired_result_asa
+            asa_nr.inventory.groups["asa"]["config"] == desired_result_asa
         ), err_msg.format("ASA")
 
+    # 1c. Tests engine runs generate_acl_config properly
+    def test_generate_acl_engine(self, capsys):
+        err_msg = "❌ generate_acl_engine: Engine running generate_acl_config failed"
+        desired_result = [
+            "\nip access-list extended UTEST_SSH_ACCESS\n remark MGMT Access - VLAN810\n permit ip 172.17.10.0 0.0.0.255 any\n remark Citrix Access\n permit ip host 10.10.109.10 any\n deny ip any any",
+            "ip access-list extended UTEST_SNMP_ACCESS\n deny ip host 10.10.209.11 any\n permit ip any any",
+        ]
+        nr = nr_inv.filter(F(groups__any=["ios", "iosxe"]))
+        nr_task.generate_acl_engine(nr, acl)
+        assert nr.inventory.groups["ios"]["config"] == desired_result, err_msg
+
     # 1c. Tests script catches that no config was generated
-    def test_dont_generate_acl_config(self, capsys):
-        err_msg = "❌ generate_acl_config: Failfast if no ios/iosxe/nxos/asa failed"
+    def test_generate_acl_engine_err(self, capsys):
+        err_msg = "❌ generate_acl_engine: Failfast if no ios/iosxe/nxos/asa failed"
         desired_result = (
             "nornir_template*****************************************************************\n"
             "❌ Error: No config generated as are no objects in groups ios, iosxe, nxos or \nasa\n"
         )
         tmp_nr_inv = nr_inv.filter(F(groups__any=["wlc"]))
         try:
-            nr_task.generate_acl_config(tmp_nr_inv, acl)
+            nr_task.generate_acl_engine(tmp_nr_inv, acl)
         except SystemExit:
             pass
         assert capsys.readouterr().out == desired_result, err_msg
@@ -195,14 +214,65 @@ class TestNornirTemplate:
 # ----------------------------------------------------------------------------
 @pytest.mark.usefixtures("load_vars")
 class TestFormatAcl:
+
+    # 2a. Test creating of show and delete commands
+    def test_show_del_cmd(self):
+        err_msg = "❌ show_del_cmd: {} show and delete command formatting failed"
+        desired_result_ios = {
+            "show": [
+                "show run | sec access-list extended UTEST_SSH_ACCESS_",
+                "show run | sec access-list extended UTEST_SNMP_ACCESS_",
+            ],
+            "del": [
+                "no ip access-list extended UTEST_SSH_ACCESS",
+                "no ip access-list extended UTEST_SNMP_ACCESS",
+            ],
+        }
+        desired_result_nxos = {
+            "show": [
+                "show run | sec 'ip access-list UTEST_SSH_ACCESS'",
+                "show run | sec 'ip access-list UTEST_SNMP_ACCESS'",
+            ],
+            "del": [
+                "no ip access-list extended UTEST_SSH_ACCESS",
+                "no ip access-list extended UTEST_SNMP_ACCESS",
+            ],
+        }
+        desired_result_asa = {"del": None, "show": ["show run ssh", "show run http"]}
+
+        assert (
+            nr_task.show_del_cmd("ios/iosxe", acl["name"]) == desired_result_ios
+        ), err_msg.format("IOS/IOS-XE")
+        assert (
+            nr_task.show_del_cmd("nxos", acl["name"]) == desired_result_nxos
+        ), err_msg.format("NXOS")
+        assert (
+            nr_task.show_del_cmd("asa", acl["name"]) == desired_result_asa
+        ), err_msg.format("ASA")
+
+    # 2b. Test creating of show and delete commands
+    def test_format_asa(self):
+        err_msg = (
+            "❌ format_asa: ASA formatting to remove non SSH/HTTP access lines failed"
+        )
+        backup_acl_config = [
+            "ssh stricthostkeycheck\nssh 10.17.10.0 255.255.255.0 mgmt\nssh 10.10.10.10 255.255.255.255 mgmt\nssh timeout 30",
+            "http server enable\nhttp 0.0.0.0 0.0.0.0 mgmt",
+        ]
+        desired_result = [
+            "ssh 10.17.10.0 255.255.255.0 mgmt\nssh 10.10.10.10 255.255.255.255 mgmt",
+            "http 0.0.0.0 0.0.0.0 mgmt",
+        ]
+        assert nr_task.format_asa(backup_acl_config) == desired_result, err_msg
+
     # 2a. Test formatting ASA SSH and HTTP config for deletion (add no to cmds)
     def test_asa_del(self):
         err_msg = "❌ asa_del: ASA delete command formatting failed"
         desired_result = [
-            "no ssh 172.17.10.0 255.255.255.0 MGMT",
-            "no ssh host 10.10.109.10 MGMT",
-            "no http 172.17.10.0 255.255.255.0 MGMT",
-            "no http host 10.10.109.10 MGMT",
+            "no ssh 172.17.10.0 255.255.255.0 mgmt",
+            "no ssh host 10.10.109.10 mgmt",
+            "no http 172.17.10.0 255.255.255.0 mgmt",
+            "no http host 10.10.109.10 mgmt",
         ]
         assert nr_task.asa_del(asa_config) == desired_result, err_msg
 
@@ -221,20 +291,6 @@ class TestFormatAcl:
 
     # 2c. Test formatting config into lists of commands, uses 'asa_del' and 'list_of_cmds' methods
     def test_format_config(self):
-        err_msg = "❌ format_config: Formatting of ASA config ready to apply failed"
-        desired_result = [
-            "no ssh 172.17.10.0 255.255.255.0 MGMT",
-            "no ssh host 10.10.109.10 MGMT",
-            "no http 172.17.10.0 255.255.255.0 MGMT",
-            "no http host 10.10.109.10 MGMT",
-            "ssh 172.17.10.0 255.255.255.0 MGMT",
-            "ssh host 10.10.109.10 MGMT",
-            "http 172.17.10.0 255.255.255.0 MGMT",
-            "http host 10.10.109.10 MGMT",
-        ]
-        actual_result = nr_task.format_config(dm_task, asa_config, asa_config)
-        assert actual_result == desired_result, err_msg
-
         err_msg = "❌ format_config: Formatting of ASA config ready to apply failed"
         desired_result = [
             "no ip access-list extended TEST1",
@@ -262,7 +318,7 @@ class TestNornirCfg:
     # 3a. Tests collecting backup of ACL from device
     def test_backup_acl(self):
         err_msg = "❌ backup_acl: Task to gather backup of ACL from device failed"
-        backup_acl_config = nr_host.run(task=nr_task.backup_acl, show_cmd=acl["show"])
+        backup_acl_config = nr_host.run(task=nr_task.backup_acl, show_cmd=cmds["show"])
         nr_host.data.reset_failed_hosts()
         assert (
             backup_acl_config["TEST_DEVICE"][0].result
@@ -283,8 +339,8 @@ class TestNornirCfg:
         result = nr_host.run(
             name="Test diff",
             task=nr_task.get_difference,
-            sw_acl=acl["base_acl"],
-            tmpl_acl=acl["base_acl"],
+            sw_acl=acl["base_acl"].split("\n\n"),
+            tmpl_acl=acl["base_acl"].split("\n\n"),
         )
         nr_host.data.reset_failed_hosts()
         assert (
@@ -316,7 +372,7 @@ class TestNornirCfg:
     # 3d. Tests applying config
     def test_apply_acl(self):
         err_msg = "❌ test_apply_acl: Test task to successfully apply ACL config failed"
-        acl_config = acl["delete"].copy()
+        acl_config = cmds["del"].copy()
         acl_config.extend(acl["base_acl"].splitlines())
         result = nr_host.run(
             task=nr_task.apply_acl, acl_config=acl_config, backup_config=""
@@ -335,11 +391,11 @@ class TestNornirCfg:
     # 3e. Test applying config and rollback
     def test_apply_acl_rollback(self):
         err_msg = "❌ test_apply_acl: Test task to apply and rollback ACL config failed"
-        acl_config = acl["delete"].copy()
+        acl_config = cmds["del"].copy()
         acl_config.extend(
             ["ip access-list extended UTEST_SSH_ACCESS", "deny ip any any"]
         )
-        backup_config = acl["delete"].copy()
+        backup_config = cmds["del"].copy()
         backup_config.extend(acl["base_acl"].splitlines())
         result = nr_host.run(
             task=nr_task.apply_acl, acl_config=acl_config, backup_config=backup_config

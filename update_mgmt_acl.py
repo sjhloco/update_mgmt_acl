@@ -146,14 +146,12 @@ class InputValidate:
     # 2. ACL_FMT: Creates show and delete cmds as well as VARs for wildcard ACLs (convert prefix to wildcard)
     # ----------------------------------------------------------------------------
     def format_input_vars(self, acl_vars: Dict[str, Any]) -> Dict[str, Any]:
-        show_acls: List = []
-        delete_acls: List = []
+        acl_name: List = []
         mask_acl_vars: Dict[str, List] = dict(acl=[])
         wcard_acl_vars: Dict[str, List] = dict(acl=[])
 
         for each_acl in acl_vars["acl"]:
-            show_acls.append(f"show run | sec access-list extended {each_acl['name']}_")
-            delete_acls.append(f"no ip access-list extended {each_acl['name']}")
+            acl_name.append(each_acl["name"])
             mask_ace = []  # uses subnet rather than prefix
             wcard_ace = []  # uses wildcards rather than prefix
             for each_ace in each_acl["ace"]:
@@ -178,7 +176,7 @@ class InputValidate:
                         wcard: str = ip_wcard.split("/")[1]
                         # 2c. Formats the subnet mask
                         if mask == "255.255.255.255":
-                            mask_ace.append({list(each_ace.keys())[0]: "host " + ip})
+                            mask_ace.append({list(each_ace.keys())[0]: ip + " " + mask})
                             wcard_ace.append({list(each_ace.keys())[0]: "host " + ip})
                         else:
                             mask_ace.append({list(each_ace.keys())[0]: ip + " " + mask})
@@ -191,8 +189,7 @@ class InputValidate:
             mask_acl_vars["acl"].append(dict(name=each_acl["name"], ace=mask_ace))
             wcard_acl_vars["acl"].append(dict(name=each_acl["name"], ace=wcard_ace))
         return dict(
-            show=show_acls,
-            delete=delete_acls,
+            name=acl_name,
             wcard=wcard_acl_vars,
             mask=mask_acl_vars,
             prefix=acl_vars,
@@ -235,30 +232,11 @@ def main(inv_settings: str, no_orion: bool = no_orion):
 
     # 5. Render the config and adds as a group_var
     nr_task = NornirTask()
-    nr_inv = nr_task.generate_acl_config(nr_inv, acl)
+    nr_inv = nr_task.generate_acl_engine(nr_inv, acl)
 
-    # # 6. Apply the config
+    # 6. Apply the config
     nr_task.config_engine(nr_inv, args.get("apply"))
-
-    # Gets info from Orion and loads the inventory
-    #
-    # nr = load_nornir_inventory(npm_pword)
-
-
-# TESTING:
-# Can unit test
-#     args = _create_parser()         make sure taking valus, not sure needed
-#     validate.validate_file(args)    validating acl
-#     filter_nornir_inventory         filtering works, but i=will need fixtures to create nr conn
-# When run need an option for filter (how o input 2 filters) and dry run (default is True)
 
 
 if __name__ == "__main__":
     main("inv_settings.yml")
-
-
-# Where did i put info about open connection, is waht need for the telnet
-# When using the open_connection you can specify any parameters you want.
-# If you don’t, or if you let nornir open the connection automatically, nornir will read those parameters from the inventory.
-# You can specify standard attributes at the object level if you want to reuse them across different connections or you can override them for each connection.
-# https://nornir.readthedocs.io/en/latest/howto/handling_connections.html

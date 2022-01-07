@@ -108,7 +108,7 @@ class TestValidateFile:
     # ----------------------------------------------------------------------------
     # 1d. Validatess check combined ACE errors are returned
     # ----------------------------------------------------------------------------
-    def test__assert_acl(self):
+    def test_assert_acl(self):
         err_msg = "❌ _assert_acl: Unit test combined ace errors failed"
         desired_result = {
             "TEST_ACL": [
@@ -130,7 +130,7 @@ class TestValidateFile:
     # ----------------------------------------------------------------------------
     # 1e. Validatess check that each ACL has a name and ACE is a list
     # ----------------------------------------------------------------------------
-    def test__assert_acl1(self, capsys):
+    def test_assert_acl1(self, capsys):
         err_msg = "❌ _assert_acl: Unit test for acl 'name' dictionary existence failed"
         desired_result = (
             "❌ AclError: ACL name is missing or the  ACE dictionary is not a list\n"
@@ -213,14 +213,7 @@ class TestValidateFile:
             "❌ format_input_vars: Unit test for the creation of ACL variables failed"
         )
         desired_result = {
-            "delete": [
-                "no ip access-list extended SSH_ACCESS",
-                "no ip access-list extended SNMP_ACCESS",
-            ],
-            "show": [
-                "show run | sec access-list extended SSH_ACCESS_",
-                "show run | sec access-list extended SNMP_ACCESS_",
-            ],
+            "name": ["SSH_ACCESS", "SNMP_ACCESS"],
             "wcard": {
                 "acl": [
                     {
@@ -247,13 +240,16 @@ class TestValidateFile:
                             {"remark": "MGMT Access - VLAN810"},
                             {"permit": "172.17.10.0 255.255.255.0"},
                             {"remark": "Citrix Access"},
-                            {"permit": "host 10.10.109.10"},
+                            {"permit": "10.10.109.10 255.255.255.255"},
                             {"deny": "any"},
                         ],
                     },
                     {
                         "name": "SNMP_ACCESS",
-                        "ace": [{"deny": "host 10.10.209.11"}, {"permit": "any"}],
+                        "ace": [
+                            {"deny": "10.10.209.11 255.255.255.255"},
+                            {"permit": "any"},
+                        ],
                     },
                 ]
             },

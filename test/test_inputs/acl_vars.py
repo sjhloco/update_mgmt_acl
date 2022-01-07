@@ -1,12 +1,8 @@
 # Variables used as inputs for testing nornir with test_nornir.py and test_nornir_cfg.py
 acl = {
-    "show": [
-        "show run | sec access-list extended UTEST_SSH_ACCESS",
-        "show run | sec access-list extended UTEST_SNMP_ACCESS",
-    ],
-    "delete": [
-        "no ip access-list extended UTEST_SSH_ACCESS",
-        "no ip access-list extended UTEST_SNMP_ACCESS",
+    "name": [
+        "UTEST_SSH_ACCESS",
+        "UTEST_SNMP_ACCESS",
     ],
     "wcard": {
         "acl": [

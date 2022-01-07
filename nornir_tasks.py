@@ -1,27 +1,19 @@
 from typing import Any, Dict, List
-import getpass
 import sys
 import socket
 import logging
 import difflib
-import getpass
-import yaml
-
+import ipaddress
 from rich.console import Console
 from rich.theme import Theme
 
 from nornir.core.filter import F
-
 from nornir.core.task import Task, Result
 from nornir_utils.plugins.functions import print_title, print_result
 from nornir_jinja2.plugins.tasks import template_file
-
 from nornir_netmiko.tasks import netmiko_send_command, netmiko_send_config
 
 from nornir_validate.nr_val import validate_task
-
-# from validate.actual_state import actual_state_engine
-# from validate.custom_validate import compliance_report
 
 
 class NornirTask:
@@ -32,14 +24,13 @@ class NornirTask:
     # ----------------------------------------------------------------------------
     # TMPL: Nornir task to renders the template and ACL_VAR input to produce the config
     # ----------------------------------------------------------------------------
-    def template_config(
-        self, task: Task, info: str, template: str, acl: Dict[str, Any]
-    ) -> Result:
+    def template_config(self, task: Task, os_type: str, acl: Dict[str, Any]) -> Result:
         task.run(
             task=template_file,
-            name=f"Generating {info} configuration",
-            template=template,
+            name=f"Generating {os_type.upper()} configuration",
+            template="cfg_acl_tmpl.j2",
             path="templates/",
+            os_type=os_type,
             acl_vars=acl,
         )
 
@@ -56,8 +47,38 @@ class NornirTask:
         return "Backing up current ACL configurations"
 
     # ----------------------------------------------------------------------------
-    # FORMAT_CFG: Formats config cmds aswell as the ASA show cmds
+    # FORMAT_CFG: Formats config cmds as well as the ASA show cmds
     # ----------------------------------------------------------------------------
+    # SHOW_DEL: Creates the show and delete ACLs (excpet for ASA del as needs to be done once got backup)
+    def show_del_cmd(self, os_type, acl_name):
+        show_cmds, del_cmds = ([] for i in range(2))
+        if os_type == "asa":
+            show_cmds = ["show run ssh", "show run http"]
+            del_cmds = None
+        elif os_type == "ios/iosxe":
+            for each_name in acl_name:
+                show_cmds.append(f"show run | sec access-list extended {each_name}_")
+                del_cmds.append(f"no ip access-list extended {each_name}")
+        elif os_type == "nxos":
+            for each_name in acl_name:
+                show_cmds.append(f"show run | sec 'ip access-list {each_name}'")
+                del_cmds.append(f"no ip access-list extended {each_name}")
+        return {"show": show_cmds, "del": del_cmds}
+
+    # FMT_ASA: Removes all now access lines from the SSH and HTTP cmds
+    def format_asa(self, backup_acl_config):
+        tmp_backup_acl_config = []
+        for each_type in backup_acl_config:
+            tmp_type = []
+            for each_line in each_type.splitlines():
+                try:
+                    ipaddress.IPv4Interface(each_line.split()[1])
+                    tmp_type.append(each_line)
+                except:
+                    pass
+            tmp_backup_acl_config.append("\n".join(tmp_type))
+        return tmp_backup_acl_config
+
     # ASA: Creates delete SSH and HTTP cmds for ASAs as doesn't use ACLs
     def asa_del(self, config):
         del_cmds = []
@@ -75,9 +96,42 @@ class NornirTask:
 
     # CFG: Joins delete cmds to config or backup_config ready to apply
     def format_config(self, task, config1, config2):
-        config = task.host.get("delete_cmd", self.asa_del(config1)).copy()
+        # ASA needs to create delete command list from backup config
+        if task.host["delete_cmd"] == None:
+            task.host["delete_cmd"] = self.asa_del(config1).copy()
+        config = task.host["delete_cmd"].copy()
         config.extend(self.list_of_cmds(config2))
         return config
+
+    # ----------------------------------------------------------------------------
+    # GENERATE: Creates config, show cmds, delete cmds and adds validate input data,
+    # ----------------------------------------------------------------------------
+    def generate_acl_config(
+        self,
+        nr_inv: "Nornir",
+        os_type: str,
+        acl_name: str,
+        acl: Dict[str, Any],
+        val_acl: Dict[str, Any],
+    ) -> None:
+        nr_inv = nr_inv.filter(F(name=list(nr_inv.inventory.hosts.keys())[0]))
+        config = nr_inv.run(
+            task=self.template_config,
+            os_type=os_type,
+            acl=acl,
+        )
+        # Prints the per-group config (what was rendered by template)
+        print_result(config[list(config.keys())[0]][1])
+        # Creates host_vars for config (list of each ACL) and commands for show and delete ACLs
+        for grp in os_type.split("/"):
+            nr_inv.inventory.groups[grp]["config"] = (
+                config[list(config.keys())[0]][1].result.rstrip().split("\n\n")
+            )
+            cmds = self.show_del_cmd(os_type, acl_name)
+            nr_inv.inventory.groups[grp]["show_cmd"] = cmds["show"]
+            nr_inv.inventory.groups[grp]["delete_cmd"] = cmds["del"]
+            # VAL: Adds prefix ACL to be used for the nornir-validate file
+            nr_inv.inventory.groups[grp]["acl_val"] = {"groups": {grp: val_acl}}
 
     # ----------------------------------------------------------------------------
     # DIFF: Finds the differences between current device ACLs and templated ACLs (- is removed, + is added)
@@ -87,13 +141,22 @@ class NornirTask:
 
         for each_sw_acl, each_tmpl_acl in zip(sw_acl, tmpl_acl):
             # Creates a new ACL with just the ACL name to hold the differences
-            tmp_diff_list = [each_tmpl_acl.splitlines()[0]]
+            if "access-list" in each_tmpl_acl.splitlines()[0]:
+                tmp_diff_list = [each_tmpl_acl.splitlines()[0]]
+            else:  # ASAs dont have ACL name
+                tmp_diff_list = [""]
             # Creates a list of common elements between and differences between the ACLs (replace removes '  ' after deny in ACLs)
             diff = difflib.ndiff(
-                each_sw_acl.lstrip().replace("   ", " ").splitlines(),
+                each_sw_acl.lstrip()
+                .replace("   ", " ")
+                .replace(" \n", "\n")
+                .splitlines(),
                 each_tmpl_acl.lstrip().splitlines(),
             )
             diff = list(diff)
+            # Removes duplicate if ACL does not already exist
+            if "+ " + "".join(tmp_diff_list) == diff[0]:
+                del tmp_diff_list[0]
             # Only takes the differences (- or +, separate loops so can group them) and removes new lines (n)
             for each_diff in diff:
                 if each_diff.startswith("- "):
@@ -144,7 +207,7 @@ class NornirTask:
     # ----------------------------------------------------------------------------
     # 1. TMPL_ENGINE: Engine to create device configs from templates
     # ----------------------------------------------------------------------------
-    def generate_acl_config(self, nr_inv: "Nornir", acl: Dict[str, Any]) -> "Nornir":
+    def generate_acl_engine(self, nr_inv: "Nornir", acl: Dict[str, Any]) -> "Nornir":
         # Get all the members (hosts) of each group
         iosxe_nr = nr_inv.filter(F(groups__any=["ios", "iosxe"]))
         nxos_nr = nr_inv.filter(F(groups__any=["nxos"]))
@@ -155,62 +218,19 @@ class NornirTask:
         )
         # 1a. IOS: Create config (runs against first host in group), print to screen and assign as a group_var
         if len(iosxe_nr.inventory.hosts) != 0:
-            iosxe_nr = iosxe_nr.filter(F(name=list(iosxe_nr.inventory.hosts.keys())[0]))
-            config = iosxe_nr.run(
-                task=self.template_config,
-                info="IOS/IOS-XE",
-                template="cfg_iosxe_acl_tmpl.j2",
-                acl=acl["wcard"],
+            self.generate_acl_config(
+                iosxe_nr, "ios/iosxe", acl["name"], acl["wcard"], acl["prefix"]
             )
-            print_result(config[list(config.keys())[0]][1])
-            # Creates host_vars for config (list of each ACL) and commands for show and delete ACLs
-            for grp in ["ios", "iosxe"]:
-                nr_inv.inventory.groups[grp]["config"] = (
-                    config[list(config.keys())[0]][1].result.rstrip().split("\n\n")
-                )
-                nr_inv.inventory.groups[grp]["show_cmd"] = acl["show"]
-                nr_inv.inventory.groups[grp]["delete_cmd"] = acl["delete"]
-                # VAL: Adds prefix ACL to be used for the nornir-validate file
-                nr_inv.inventory.groups[grp]["acl_val"] = {
-                    "groups": {grp: acl["prefix"]}
-                }
-
         # 1b. NXOS: Create config (runs against first host in group), print to screen and assign as a group_var
         if len(nxos_nr.inventory.hosts) != 0:
-            nxos_nr = nxos_nr.filter(F(name=list(nxos_nr.inventory.hosts.keys())[0]))
-            config = nxos_nr.run(
-                task=self.template_config,
-                info="NXOS",
-                template="cfg_nxos_acl_tmpl.j2",
-                acl=acl["prefix"],
+            self.generate_acl_config(
+                nxos_nr, "nxos", acl["name"], acl["prefix"], acl["prefix"]
             )
-            print_result(config[list(config.keys())[0]][1])
-            # Creates host_vars for config and commands for show and delete ACLs
-            nr_inv.inventory.groups["nxos"]["config"] = (
-                config[list(config.keys())[0]][1].result.rstrip().split("\n\n")
-            )
-            nr_inv.inventory.groups[grp]["show_cmd"] = acl["show"]
-            nr_inv.inventory.groups[grp]["delete_cmd"] = acl["delete"]
-            # VAL: Adds prefix ACL to be used for the nornir-validate file
-            nr_inv.inventory.groups[grp]["acl_val"] = {"groups": {grp: acl["prefix"]}}
-
         # 1c. ASA: Create config (runs against first host in group), print to screen and assign as a group_var
         if len(asa_nr.inventory.hosts) != 0:
-            asa_nr = asa_nr.filter(F(name=list(asa_nr.inventory.hosts.keys())[0]))
-            config = asa_nr.run(
-                task=self.template_config,
-                info="ASA",
-                template="cfg_asa_acl_tmpl.j2",
-                acl=acl["mask"],
+            self.generate_acl_config(
+                asa_nr, "asa", acl["name"], acl["mask"], acl["prefix"]
             )
-            print_result(config[list(config.keys())[0]][1])
-            # Creates host_vars for config and commands for show and delete ACLs
-            nr_inv.inventory.groups["asa"]["config"] = (
-                config[list(config.keys())[0]][1].result.rstrip().split("\n\n")
-            )
-            # VAL: Adds prefix ACL to be used for the nornir-validate file
-            nr_inv.inventory.groups[grp]["acl_val"] = {"groups": {grp: acl["prefix"]}}
-
         # 1d. FAILFAST: If no config generated is nothing to configure on devices
         if (
             len(iosxe_nr.inventory.hosts) == 0
@@ -229,14 +249,14 @@ class NornirTask:
     # ----------------------------------------------------------------------------
     def task_engine(self, task: Task, dry_run: bool) -> Result:
         # 2a.BACKUP: Gathers a backup of the current ACL configuration (ASA doesn't use ACLs so change cmd)
-        result = task.run(
-            task=self.backup_acl,
-            show_cmd=task.host.get("show_cmd", ["show run ssh", "show run http"]),
-        )
+        result = task.run(task=self.backup_acl, show_cmd=task.host["show_cmd"])
         # Creates a list with each element being an ACL
         backup_acl_config = []
         for each_acl in result[1:]:
             backup_acl_config.append(each_acl.result)
+        # ASA needs to remove non access based info from ssh and http cmds
+        if task.host.dict()["groups"][0] == "asa":
+            backup_acl_config = self.format_asa(backup_acl_config)
 
         # 2b. DIFF: Splits into a list of ACLs and uses them to gather differences
         acl_diff = task.run(
@@ -245,6 +265,7 @@ class NornirTask:
             sw_acl=backup_acl_config,
             tmpl_acl=task.host["config"],
         )
+
         # 2c. DRY_RUN: If is a dry run no need to do anything else
         if dry_run == True:
             print_title(
@@ -262,17 +283,18 @@ class NornirTask:
                 acl_config = self.format_config(
                     task, backup_acl_config, task.host["config"]
                 )
+                from pprint import pprint
+
                 backup_config = self.format_config(
                     task, task.host["config"], backup_acl_config
                 )
-                # Runs the apply config task
                 task.run(
                     task=self.apply_acl,
                     acl_config=acl_config,
                     backup_config=backup_config,
                 )
                 # 2e. VALIDATE: Runs nornir-validate to validate the ACL
-                # task.run(task=validate_task, input_file=task.host["acl_val"])
+                task.run(task=validate_task, input_data=task.host["acl_val"])
 
     # ----------------------------------------------------------------------------
     # 3. CFG ENGINE: Engine to run main-task to apply config
@@ -280,84 +302,3 @@ class NornirTask:
     def config_engine(self, nr_inv: "Nornir", dry_run: bool) -> Result:
         result = nr_inv.run(task=self.task_engine, dry_run=dry_run)
         print_result(result)
-
-    # ##4b. TMPL_VAL: Renders the validate desired state file from the ACL_VAR input
-    # def template_desired(
-    #     self, task: Task, template: str, acl: Dict[str, Any]
-    # ) -> Result:
-    #     desired_state = {}
-    #     tmp_desired_state = task.run(
-    #         task=template_file,
-    #         template=template,
-    #         path="validate/",
-    #         acl_vars=acl,
-    #         severity_level=logging.DEBUG,
-    #     ).result
-    #     # Converts jinja string into yaml and list of dicts [cmd: {seq: ket:val}] into a dict of cmds {cmd: {seq: key:val}}
-    #     for each_list in yaml.load(tmp_desired_state, Loader=yaml.SafeLoader):
-    #         desired_state.update(each_list)
-    #     breakpoint()
-    #     return desired_state
-
-    # Builds desired config used for validation after ACL applied
-    # desired_state = iosxe_nr.run(
-    #     task=self.template_desired,
-    #     template="desired_state.j2",
-    #     acl=acl["prefix"],
-    # )
-    # nr_fltr.inventory.groups["ios"]["desired_state"] = desired_state[
-    #     list(desired_state.keys())[0]
-    # ][1].result
-    # nr_fltr.inventory.groups["iosxe"]["desired_state"] = desired_state[
-    #     list(desired_state.keys())[0]
-    # ][1].result
-
-    # # 4h, APPLY: Validates ACL actual state against desired state
-    # def validate_task(task: Task) -> str:
-    #     cmd_output = {}
-    #     # Using commands from the desired output gathers the actual config from the device
-    #     for each_cmd in task.host.desired_state.keys():
-    #         cmd_output[each_cmd] = task.run(
-    #             task=netmiko_send_command,
-    #             command_string=each_cmd,
-    #             use_textfsm=True,
-    #             severity_level=logging.DEBUG,
-    #         ).result
-    #     # Formats the returned data into dict of cmds {cmd: {seq: key:val}} same as desired_state
-    #     actual_state = actual_state_engine(str(task.host.groups[0]), cmd_output)
-    #     # Uses Napalm_validate validate method to generate a compliance report
-    #     comply_result = compliance_report(task.host.desired_state, actual_state)
-    #     # f Nornir returns compliance result or if fails the compliance report
-    #     return Result(
-    #         host=task.host,
-    #         failed=comply_result["failed"],
-    #         result=comply_result["result"],
-    #     )
-
-
-# # def verify_acl_config(task):
-# #     pass
-# #     # Can get the output in parsed from so just need to inport custme validate and use
-# #     # cmd['ET-6509E-VSS-01'].scrapli_response.genie_parse_output()
-# # acl_vars = format_input_vars()
-# # # print_title("Playbook to configure the network")
-# # result = tmp_host_nr.run(task=generate_acl_config)
-# # # print(acl_config)
-# # # result1 = nr.run(task=apply_acl_config)
-# # # breakpoint()
-# # # print_result(result1, vars=['test'])
-# # # print_result(result)
-
-
-# #     def verify_config(self):
-# #         pass
-# # c = Connection(hostname='Router',
-# #                             start=['mock_device_cli --os ios --state login'],
-# #                             os='ios',
-# #                             username='cisco',
-# #                             tacacs_password='cisco',
-# #                             enable_password='cisco')
-# # c.connect()
-
-# def apply_acl(self, task: Task, acl_config: str, backup_config: str) -> Result:
-# Manually open the connection, all tasks are run under this open connection so can rollback in same conn

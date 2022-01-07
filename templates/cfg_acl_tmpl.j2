@@ -1,0 +1,51 @@
+{# ################################### IOS/IOS-XE ################################## #}
+{% if os_type == 'ios/iosxe' %}
+
+{% for each_acl in acl_vars.acl %}
+ip access-list extended {{ each_acl.name }}
+{% for each_ace in each_acl.ace %}
+{% if each_ace.keys() | list | first == 'remark' %}
+ {{ each_ace.keys() | list | first }} {{ each_ace.values() | list | first }}
+{% else %}
+ {{ each_ace.keys() | list | first }} ip {{ each_ace.values() | list | first }} any
+{% endif %}{% endfor %}
+
+{% endfor %}
+
+{# #################################### NXOS ################################### #}
+{% elif  os_type == 'nxos' %}
+{% for each_acl in acl_vars.acl %}
+ip access-list {{ each_acl.name }}
+{% set seq = namespace(cnt=10) %}
+{% for each_ace in each_acl.ace %}
+{% if each_ace.keys() | list | first == 'remark' %}
+  {{ seq.cnt }} {{ each_ace.keys() | list | first }} {{ each_ace.values() | list | first }}
+{% else %}
+  {{ seq.cnt }} {{ each_ace.keys() | list | first }} ip {{ each_ace.values() | list | first }} any
+{% endif %}
+{% set seq.cnt = seq.cnt + 10 %}
+{% endfor %}
+
+{% endfor %}
+
+{# #################################### ASA ################################### #}
+{% elif 'asa' == os_type %}
+
+{% for each_ace in acl_vars.acl[0].ace %}
+{% if each_ace.keys() | list | first == 'permit' %}
+{% if each_ace.values() | list | first == 'any' %}
+ssh 0.0.0.0 0.0.0.0 mgmt
+{% else %}
+ssh {{ each_ace.values() | list | first }} mgmt
+{% endif %}{% endif %}{% endfor %}
+
+{% for each_ace in acl_vars.acl[0].ace %}
+{% if each_ace.keys() | list | first == 'permit' %}
+{% if each_ace.values() | list | first == 'any' %}
+http 0.0.0.0 0.0.0.0 mgmt
+{% else %}
+http {{ each_ace.values() | list | first }} mgmt
+{% endif %}{% endif %}{% endfor %}
+
+{# ############################ END of devices ################################# #}
+{% endif %}
