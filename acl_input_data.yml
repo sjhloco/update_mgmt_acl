@@ -1,46 +1,17 @@
 acl:
-  - name: FOS_SSH_ACCESS
+  - name: SSH_ACCESS
     ace:
-      - { remark: MGMT Orion - SRVFOSSWAPP01 SRVFOSSWAPP04 }
-      - { permit: 172.25.24.168/32 }
-      - { permit: 172.25.24.230/32 }
-      - { remark: MGMT Access - ET-VLAN810 }
-      - { permit: 172.17.10.0/24 }
-      - { remark: Citrix Access - DC1FOSXA101 DC2FOSXA101 }
-      - { permit: 10.100.109.103/32 }
-      - { permit: 10.200.109.103/32 }
-      - { remark: MGMT SCP - SRVFOSFTP01 }
-      - { permit: 172.25.24.44/32 }
-      - { remark: MGMT APIC - DC-APIC-EM01 }
-      - { permit: 172.25.24.32/32 }
-      - { remark: MGMT Prime Inf - SRVFOSNCS01 }
-      - { permit: 172.25.24.31/32 }
-      - { remark: MGMT Access - DC1_WIRELESS DC2_WIRELESS }
-      - { permit: 10.100.108.224/27 }
-      - { permit: 10.200.108.224/27 }
-      - { remark: MGMT Access - DC1_AC_VPN DC2_AC_VPN }
-      - { permit: 10.251.16.0/24 }
-      - { permit: 10.251.48.0/24 }
+      - { remark: MGMT Orion - SRVWAPP01 SRVWAPP04 }
+      - { permit: 10.2.24.168/32 }
+      - { permit: 10.2.24.230/32 }
+      - { remark: MGMT Access - VLAN810 }
+      - { permit: 10.17.10.0/24 }}
       - { permit: any }
-  - name: FOS_SNMP_ACCESS
+  - name: SNMP_ACCESS
     ace:
-      - { remark: MGMT Orion - SRVFOSSWAPP01 SRVFOSSWAPP04 }
-      - { permit: 172.25.24.168/32 }
-      - { permit: 172.25.24.230/32 }
-      - { remark: MGMT Access - ET-VLAN810 }
-      - { permit: 172.17.10.0/24 }
-      - { remark: Citrix Access - DC1FOSXA101 DC2FOSXA101 }
-      - { permit: 10.100.109.103/32 }
-      - { permit: 10.200.109.103/32 }
-      - { remark: MGMT SCP - SRVFOSFTP01 }
-      - { permit: 172.25.24.44/32 }
-      - { remark: MGMT APIC - DC-APIC-EM01 }
-      - { permit: 172.25.24.32/32 }
-      - { remark: MGMT Prime Inf - SRVFOSNCS01 }
-      - { permit: 172.25.24.31/32 }
-      - { remark: MGMT Access - DC1_WIRELESS DC2_WIRELESS }
-      - { permit: 10.100.108.224/27 }
-      - { permit: 10.200.108.224/27 }
-      - { remark: MGMT Access - DC1_AC_VPN DC2_AC_VPN }
-      - { permit: 10.251.16.0/24 }
-      - { permit: 10.251.48.0 }
+      - { remark: MGMT Orion - SRVWAPP01 SRVWAPP04 }
+      - { permit: 10.2.24.168/32 }
+      - { permit: 10.2.24.230/32 }
+      - { remark: MGMT Access - VLAN810 }
+      - { permit: 10.17.10.0/24 }}
+      - { permit: any }
