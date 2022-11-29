@@ -31,9 +31,5 @@ asa:
   connection_options:
     netmiko:
       platform: cisco_asa_ssh
-checkpoint:
-  connection_options:
-    netmiko:
-      platform: checkpoint_gaia_ssh
 ftd: {}
 unknown: {}

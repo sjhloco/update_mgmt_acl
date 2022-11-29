@@ -1,7 +1,7 @@
 # A leading "**" followed by a slash (**/) means match in all directories
 **/.DS_Store
 **/__pycache__
+**/.pytest_cache
 **/nornir.log
 **/TODO
-inv_settings.yml
 /ZZZ

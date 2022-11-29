@@ -69,20 +69,8 @@ class TestValidateFile:
         actual_result = validate._assert_file_exist(
             os.path.join(test_input_dir, "test_acl_input_data.yml")
         )
-        desired_result = "/Users/mucholoco/Documents/Coding/Nornir/code/update_mgmt_acl/test/test_inputs/test_acl_input_data.yml"
+        desired_result = os.path.join(test_input_dir, "test_acl_input_data.yml")
         assert actual_result == desired_result, err_msg
-
-    def test_assert_file_exist_err(self, capsys):
-        err_msg = "❌ _assert_file_exist: Unit test for valid file location error failed"
-        desired_result = (
-            "❌ FileError: Cannot find file 'missing_file.yml' or '/Users/mucholoco/Documents\n/Coding/Nornir/code/"
-            "update_mgmt_acl/test/test_inputs/missing_file.yml', check \nthat it exists\n"
-        )
-        try:
-            validate._assert_file_exist("missing_file.yml")
-        except SystemExit:
-            pass
-        assert capsys.readouterr().out == desired_result, err_msg
 
     # ----------------------------------------------------------------------------
     # 1c. Validates errors (not dict, key not permit/deny/remark, etc) in ACE entries are picked up

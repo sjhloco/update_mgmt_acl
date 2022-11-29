@@ -4,12 +4,12 @@ import socket
 import logging
 import difflib
 import ipaddress
+
 from rich.console import Console
 from rich.theme import Theme
-
+from nornir_rich.functions import print_result
 from nornir.core.filter import F
 from nornir.core.task import Task, Result
-from nornir_utils.plugins.functions import print_title, print_result
 from nornir_jinja2.plugins.tasks import template_file
 from nornir_netmiko.tasks import netmiko_send_command, netmiko_send_config
 
@@ -49,7 +49,7 @@ class NornirTask:
     # ----------------------------------------------------------------------------
     # FORMAT_CFG: Formats config cmds as well as the ASA show cmds
     # ----------------------------------------------------------------------------
-    # SHOW_DEL: Creates the show and delete ACLs (excpet for ASA del as needs to be done once got backup)
+    # SHOW_DEL: Creates the show and delete ACLs (except for ASA del as needs to be done once got backup)
     def show_del_cmd(self, os_type, acl_name):
         show_cmds, del_cmds = ([] for i in range(2))
         if os_type == "asa":
@@ -62,7 +62,7 @@ class NornirTask:
         elif os_type == "nxos":
             for each_name in acl_name:
                 show_cmds.append(f"show run | sec 'ip access-list {each_name}'")
-                del_cmds.append(f"no ip access-list extended {each_name}")
+                del_cmds.append(f"no ip access-list {each_name}")
         return {"show": show_cmds, "del": del_cmds}
 
     # FMT_ASA: Removes all now access lines from the SSH and HTTP cmds
@@ -104,7 +104,7 @@ class NornirTask:
         return config
 
     # ----------------------------------------------------------------------------
-    # GENERATE: Creates config, show cmds, delete cmds and adds validate input data,
+    # GENERATE: Creates config, show cmds, delete cmds and adds validate input data
     # ----------------------------------------------------------------------------
     def generate_acl_config(
         self,
@@ -121,7 +121,7 @@ class NornirTask:
             acl=acl,
         )
         # Prints the per-group config (what was rendered by template)
-        print_result(config[list(config.keys())[0]][1])
+        print_result(config, vars=["result"])
         # Creates host_vars for config (list of each ACL) and commands for show and delete ACLs
         for grp in os_type.split("/"):
             nr_inv.inventory.groups[grp]["config"] = (
@@ -174,9 +174,9 @@ class NornirTask:
             return Result(host=task.host, result="\n".join(acl_diff))
 
     # ----------------------------------------------------------------------------
-    # APPLY: Applies config, possible rollsback dependant on if it fails.
+    # APPLY: Applies config, possible rollback is dependant on if it fails.
     # ----------------------------------------------------------------------------
-    def apply_acl(self, task: Task, acl_config: str, backup_config: str) -> Result:
+    def apply_acl(self, task: Task, acl_config: List, backup_config: List) -> Result:
         # Manually open the connection, all tasks are run under this open connection so can rollback in same conn
         task.run(
             task=netmiko_send_config,
@@ -213,9 +213,6 @@ class NornirTask:
         nxos_nr = nr_inv.filter(F(groups__any=["nxos"]))
         asa_nr = nr_inv.filter(F(groups__any=["asa"]))
 
-        self.rc.print(
-            "[b cyan]nornir_template*****************************************************************[/b cyan]"
-        )
         # 1a. IOS: Create config (runs against first host in group), print to screen and assign as a group_var
         if len(iosxe_nr.inventory.hosts) != 0:
             self.generate_acl_config(
@@ -248,7 +245,7 @@ class NornirTask:
     # 2. TASK_ENGINE: Engine to call and run nornir sub-tasks
     # ----------------------------------------------------------------------------
     def task_engine(self, task: Task, dry_run: bool) -> Result:
-        # 2a.BACKUP: Gathers a backup of the current ACL configuration (ASA doesn't use ACLs so change cmd)
+        # 2a. BACKUP: Gathers a backup of the current ACL configuration (ASA doesn't use ACLs so change cmd)
         result = task.run(task=self.backup_acl, show_cmd=task.host["show_cmd"])
         # Creates a list with each element being an ACL
         backup_acl_config = []
@@ -266,39 +263,37 @@ class NornirTask:
             tmpl_acl=task.host["config"],
         )
 
-        # 2c. DRY_RUN: If is a dry run no need to do anything else
-        if dry_run == True:
-            print_title(
-                "DRY_RUN=TRUE: This is the configuration that would have been applied"
+        # 2c. APPLY: If Not a dry run and are differences apply the config
+        if (
+            dry_run == False
+            and acl_diff.result != "✅  No differences between configurations"
+        ):
+            # Adds delete cmds before acl and backup cfg (ASA changes delete cmds as no ACLs)
+            acl_config = self.format_config(
+                task, backup_acl_config, task.host["config"]
             )
-        # 2d. APPLY: If Not a dry run and are differences apply the config
-        elif dry_run == False:
-            if acl_diff.result == "✅  No differences between configurations":
-                print_title(
-                    "DRY_RUN=False: No need for any configuration to be applied"
-                )
-            else:
-                print_title("DRY_RUN=False: This is result of configuration applied")
-                # Adds delete cmds before acl and backup cfg (ASA changes delete cmds as no ACLs)
-                acl_config = self.format_config(
-                    task, backup_acl_config, task.host["config"]
-                )
-                from pprint import pprint
-
-                backup_config = self.format_config(
-                    task, task.host["config"], backup_acl_config
-                )
-                task.run(
-                    task=self.apply_acl,
-                    acl_config=acl_config,
-                    backup_config=backup_config,
-                )
-                # 2e. VALIDATE: Runs nornir-validate to validate the ACL
-                task.run(task=validate_task, input_data=task.host["acl_val"])
+            backup_config = self.format_config(
+                task, task.host["config"], backup_acl_config
+            )
+            task.run(
+                task=self.apply_acl,
+                acl_config=acl_config,
+                backup_config=backup_config,
+            )
+            # 2d. VALIDATE: Runs nornir-validate to validate the ACL
+            task.run(task=validate_task, input_data=task.host["acl_val"])
 
     # ----------------------------------------------------------------------------
     # 3. CFG ENGINE: Engine to run main-task to apply config
     # ----------------------------------------------------------------------------
     def config_engine(self, nr_inv: "Nornir", dry_run: bool) -> Result:
+        if dry_run == True:
+            self.rc.print(
+                "[dark_blue][b] **** ⚠️  DRY_RUN=TRUE:[/b] This is the configuration that would have been applied [b]****[/b][/dark_blue]"
+            )
+        elif dry_run == False:
+            self.rc.print(
+                "[dark_blue][b] **** ⚠️  DRY_RUN=FALSE:[/b] If there are ACL differences the configuration will be applied [b]****[/b][/dark_blue]"
+            )
         result = nr_inv.run(task=self.task_engine, dry_run=dry_run)
-        print_result(result)
+        print_result(result, vars=["result"])

@@ -3,15 +3,11 @@ import sys
 import os
 
 from nornir.core.task import Task, Result
-
 from nornir_netmiko.tasks import netmiko_send_command, netmiko_send_config
 from dotmap import DotMap
-
-from nornir_utils.plugins.functions import print_result
-
+from nornir_rich.functions import print_result
 from nornir import InitNornir
 from nornir.core.filter import F
-
 from nornir_tasks import NornirTask
 from .test_inputs import acl_vars
 
@@ -128,7 +124,7 @@ class TestNornirTemplate:
     def test_nr_template(self):
         err_msg = "❌ template_config: Individual Nornir template task failed"
         desired_result = (
-            "\nip access-list extended UTEST_SSH_ACCESS\n"
+            "ip access-list extended UTEST_SSH_ACCESS\n"
             " remark MGMT Access - VLAN810\n"
             " permit ip 172.17.10.0 0.0.0.255 any\n"
             " remark Citrix Access\n"
@@ -138,7 +134,7 @@ class TestNornirTemplate:
             "ip access-list extended UTEST_SNMP_ACCESS\n"
             " deny ip host 10.10.209.11 any\n"
             " permit ip any any\n"
-            "\n\n"
+            "\n"
         )
         tmp_nr_inv = nr_inv.filter(F(name=list(nr_inv.inventory.hosts.keys())[0]))
         config = tmp_nr_inv.run(
@@ -150,7 +146,7 @@ class TestNornirTemplate:
     def test_generate_acl_config(self):
         err_msg = "❌ generate_acl_config: Nornir task for {} template creation and group_var failed"
         desired_result_iosxe = [
-            "\nip access-list extended UTEST_SSH_ACCESS\n remark MGMT Access - VLAN810\n permit ip 172.17.10.0 0.0.0.255 any\n remark Citrix Access\n permit ip host 10.10.109.10 any\n deny ip any any",
+            "ip access-list extended UTEST_SSH_ACCESS\n remark MGMT Access - VLAN810\n permit ip 172.17.10.0 0.0.0.255 any\n remark Citrix Access\n permit ip host 10.10.109.10 any\n deny ip any any",
             "ip access-list extended UTEST_SNMP_ACCESS\n deny ip host 10.10.209.11 any\n permit ip any any",
         ]
         desired_result_nxos = [
@@ -187,7 +183,7 @@ class TestNornirTemplate:
     def test_generate_acl_engine(self, capsys):
         err_msg = "❌ generate_acl_engine: Engine running generate_acl_config failed"
         desired_result = [
-            "\nip access-list extended UTEST_SSH_ACCESS\n remark MGMT Access - VLAN810\n permit ip 172.17.10.0 0.0.0.255 any\n remark Citrix Access\n permit ip host 10.10.109.10 any\n deny ip any any",
+            "ip access-list extended UTEST_SSH_ACCESS\n remark MGMT Access - VLAN810\n permit ip 172.17.10.0 0.0.0.255 any\n remark Citrix Access\n permit ip host 10.10.109.10 any\n deny ip any any",
             "ip access-list extended UTEST_SNMP_ACCESS\n deny ip host 10.10.209.11 any\n permit ip any any",
         ]
         nr = nr_inv.filter(F(groups__any=["ios", "iosxe"]))
@@ -197,10 +193,7 @@ class TestNornirTemplate:
     # 1c. Tests script catches that no config was generated
     def test_generate_acl_engine_err(self, capsys):
         err_msg = "❌ generate_acl_engine: Failfast if no ios/iosxe/nxos/asa failed"
-        desired_result = (
-            "nornir_template*****************************************************************\n"
-            "❌ Error: No config generated as are no objects in groups ios, iosxe, nxos or \nasa\n"
-        )
+        desired_result = "❌ Error: No config generated as are no objects in groups ios, iosxe, nxos or \nasa\n"
         tmp_nr_inv = nr_inv.filter(F(groups__any=["wlc"]))
         try:
             nr_task.generate_acl_engine(tmp_nr_inv, acl)
@@ -234,8 +227,8 @@ class TestFormatAcl:
                 "show run | sec 'ip access-list UTEST_SNMP_ACCESS'",
             ],
             "del": [
-                "no ip access-list extended UTEST_SSH_ACCESS",
-                "no ip access-list extended UTEST_SNMP_ACCESS",
+                "no ip access-list UTEST_SSH_ACCESS",
+                "no ip access-list UTEST_SNMP_ACCESS",
             ],
         }
         desired_result_asa = {"del": None, "show": ["show run ssh", "show run http"]}

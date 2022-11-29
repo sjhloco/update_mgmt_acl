@@ -1,12 +1,13 @@
 import os
 from typing import Any, Dict, List
-from rich.console import Console
-from rich.theme import Theme
 import yaml
 import ipaddress
 import sys
-
 from collections import defaultdict
+
+from rich.console import Console
+from rich.theme import Theme
+
 from nornir_orion import orion_inv
 from nornir_tasks import NornirTask
 
@@ -65,7 +66,7 @@ class InputValidate:
         elif list(each_ace.keys())[0] == "remark":
             pass
         elif list(each_ace.keys())[0] == "permit" or list(each_ace.keys())[0] == "deny":
-            # Only non IP alllowed is any
+            # Only non IP allowed is any
             if list(each_ace.values())[0] == "any":
                 pass
             else:
@@ -230,11 +231,11 @@ def main(inv_settings: str, no_orion: bool = no_orion):
     # 5. add username and password to defaults
     nr_inv = orion.inventory_defaults(nr_inv, inv_settings["device"])
 
-    # 5. Render the config and adds as a group_var
+    # 6. Render the config and adds as a group_var
     nr_task = NornirTask()
     nr_inv = nr_task.generate_acl_engine(nr_inv, acl)
 
-    # 6. Apply the config
+    # 7. Apply the config
     nr_task.config_engine(nr_inv, args.get("apply"))
 
 

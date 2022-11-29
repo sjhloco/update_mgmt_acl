@@ -1,6 +1,5 @@
 {# ################################### IOS/IOS-XE ################################## #}
 {% if os_type == 'ios/iosxe' %}
-
 {% for each_acl in acl_vars.acl %}
 ip access-list extended {{ each_acl.name }}
 {% for each_ace in each_acl.ace %}
@@ -10,7 +9,7 @@ ip access-list extended {{ each_acl.name }}
  {{ each_ace.keys() | list | first }} ip {{ each_ace.values() | list | first }} any
 {% endif %}{% endfor %}
 
-{% endfor %}
+{% endfor -%}
 
 {# #################################### NXOS ################################### #}
 {% elif  os_type == 'nxos' %}
@@ -26,7 +25,7 @@ ip access-list {{ each_acl.name }}
 {% set seq.cnt = seq.cnt + 10 %}
 {% endfor %}
 
-{% endfor %}
+{% endfor -%}
 
 {# #################################### ASA ################################### #}
 {% elif 'asa' == os_type %}
@@ -45,7 +44,7 @@ ssh {{ each_ace.values() | list | first }} mgmt
 http 0.0.0.0 0.0.0.0 mgmt
 {% else %}
 http {{ each_ace.values() | list | first }} mgmt
-{% endif %}{% endif %}{% endfor %}
+{% endif %}{% endif %}{% endfor -%}
 
 {# ############################ END of devices ################################# #}
-{% endif %}
+{% endif -%}
