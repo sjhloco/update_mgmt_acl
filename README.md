@@ -104,7 +104,7 @@ First run the script in ***dry_run*** mode to print the templated configuration 
 | `-nu` | By specifying an Orion username uses dynamic (orion) rather than static inventory
 | `-du` | Define username for all devices and prompt for a password at runtime
 
-The device credentials can be set in *inv_settings.yml* (only username) or environment variables rather than at runtime. If the username is set in multipel places the runtime value will always override them.
+The device credentials can be set in *inv_settings.yml* (only username) or environment variables rather than at runtime. If the username is set in multiple places the runtime value will always override them.
 
 - `DEVICE_USERNAME`
 - `DEVICE_PASSWORD`
@@ -114,7 +114,7 @@ $ python update_mgmt_acl.py -du test_user -g asa -f acl_input_data.yml
 $ python update_mgmt_acl.py -du test_user -g asa -f acl_input_data.yml -a
 ```
 
-To guard against locking oneself out of the devices (as changing the SSH ACL) once the ACL is applied the the connection to the device is kept open whilst a telnet on port 22 is done and the changes reverted if this fails. A further post-test validation is done on task completion using *nornir-validate* to produce a compliance report if the actual_state and desired_state do not match (only reports, does not revert the config).
+To guard against locking oneself out of the devices (as we are changing the SSH ACL) once the ACL is applied the the connection to the device is kept open whilst a telnet on port 22 is done and the changes reverted if this fails. A further post-test validation is done on task completion using *nornir-validate* to produce a compliance report if the *actual_state* and *desired_state* do not match (only reports, does not revert the config).
 
 ![example](https://user-images.githubusercontent.com/33333983/204497062-10c959cd-1d10-408e-946e-699a0922a4f2.gif)
 
@@ -122,7 +122,7 @@ To guard against locking oneself out of the devices (as changing the SSH ACL) on
 
 *Pytest* unit testing is split into 2 separate scripts.
 
-**test_update_mgmt_acl.py:** Test the *update_mgmt_acl.py* *InputValidate* class which does the input formatting, validation and is the engine that calls the other scripts. The majority of testing is done against input from the files in the *test_inputs* directory. *test_acl_input_data.yml* holds all the variables used to create the ACLs, is same format as what would be used when running script for real.
+**test_update_mgmt_acl.py:** Test the *update_mgmt_acl.py* *InputValidate* class which does the input formatting, validation and is the engine that calls the other scripts. The majority of testing is done against input from the files in the *test_inputs* directory. *test_acl_input_data.yml* holds all the variables used to create the ACLs, it is in the same format as what would be used when running script for real.
 
 ```python
 pytest test/test_update_mgmt_acl.py -vv
@@ -130,9 +130,9 @@ pytest test/test_update_mgmt_acl.py -vv
 
 **test_nornir_tasks.py:** The script is split into 3 classes to test the different elements within *nornir_tasks.py*
 
-- TestNornirTemplate: Uses a nornir inventory (in fixture setup_nr_inv) to test templating and the creation of nornir group_vars
-- TestFormatAcl: Uses dotmap and acl_config (in fixture load_vars) to test all the formatting of python objects used by nornir_tasks
-- TestNornirCfg: Uses the the fixture *setup_test_env* (with *nr_create_test_env_tasks* and *nr_delete_test_env_tasks*) to create and delete the test environment (adds ACLs and associate to vty) on a test device (in *hosts.yml*) at start and finish of the script to setup the environment to test against. This tests the application of the configuration including rollback on a failure (only tests IOS device)
+- *TestNornirTemplate:* Uses a nornir inventory (in fixture *setup_nr_inv*) to test templating and the creation of nornir *group_vars*
+- *TestFormatAcl:* Uses dotmap and *acl_config* (in fixture *load_vars*) to test all the formatting of python objects used by *nornir_tasks*
+- *TestNornirCfg:* Uses the the fixture *setup_test_env* (with *nr_create_test_env_tasks* and *nr_delete_test_env_tasks*) to create and delete the test environment (adds ACLs and associate to vty) on a test device (in *hosts.yml*) at start and finish of the script to setup the environment to test against. This tests the application of the configuration including rollback on a failure (only tests IOS device).
 
 ```python
 pytest test/test_nornir_tasks.py::TestNornirTemplate -vv
