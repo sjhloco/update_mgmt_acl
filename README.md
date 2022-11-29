@@ -48,7 +48,7 @@ acl:
 
 The *nornir-template* plugin creates *device_type* specific configuration (based on group membership) from the input variable file and adds this as a data variable (called *config*) under the relevant Nornir inventory group. If there is a member of that group in the inventory the configuration is rendered once against the first member of that group (rather than for every member) and the result printed to screen. 
 
-The template sytnax for all device types is in the one file with conditional rendering done based on the *os_type* (platform) variable. At present the following device types (groups) are supported:
+The template sytnax for all device types is in the one file with conditional rendering done based on the *os_type* (platform) variable. At present the following device types (groups) are supported.
 
 | Groups | Jinja os_type | Information
 | ------------- | ----- | ------ |
@@ -63,13 +63,13 @@ The filters used to limit which devices the script is run against are got from c
 | Filter   | Description |
 | ------- | -------------|
 | `-n` | Match any ***hostnames*** that contains this string (OR logic with upto 10 host names encased in "" separated by space)
-| `-g` | Match a ***group*** or combination of groups *(ios, iosxe, nxos, wlc, asa (includes ftd)* |
+| `-g` | Match a ***group*** or combination of groups *(ios, iosxe, nxos, wlc, asa (includes ftd))* |
 | `-l` | Match a ***physical location*** or combination of them *(DC1, DC2, etc)* |
 | `-ll` | Match a ***logical location*** or combination of them *(WAN, WAN Edge, Core, Access, etc)* |
 | `-t` | Match a ***device type*** or combination of them *(firewall, router, dc_switch, switch, etc)* |
 | `-v` | Match any ***Cisco OS version*** that contains this string |
 
-Alternatively if using a static rather than the dynamic (Orion) inventory these attributes can be defined as data dictionaries in the hosts file (*hosts.yml*).
+Alternatively if using a static rather than the dynamic (Orion) inventory these attributes can be defined as *data dictionaries* in the hosts file (*hosts.yml*).
 
 ```yaml
 HME-SWI-VSS01:
@@ -83,7 +83,7 @@ HME-SWI-VSS01:
     type: switch
 ```
 
-***`-s`*** and ***`-sd`*** flags can be used to print inventory hosts (*show*) or hosts and their attributes (*show detail*) that match the filter. These flags don't connect to devices, are used purely for viewing inventory contents.
+***`-s`*** and ***`-sd`*** runtime flags can be used to print hosts (*show*) or hosts and their attributes (*show detail*) that match the filters. No connections are made to devices, these are used purley for viewing the inventory contents.
 
 ```python
 $ python update_mgmt_acl.py -g ios -s
@@ -95,16 +95,16 @@ $ python update_mgmt_acl.py -g ios -s
 
 ## Running the script
 
-Before applying any configuration run the script in *dry_run* mode to print the templated configuration and show what changes would have been applied. If the filename does not exist the *directory* variable (default is the current working directory) from *update_mgmt_acl.py* is added to the path.
+First run the script in ***dry_run*** mode to print the templated configuration and show what changes would have been applied. If the input yaml file does not exist in the current location the *directory* variable (default is the current working directory) from *update_mgmt_acl.py* is added to the path.
 
-| flag           | Mand | Description |
-| -------------- | ---- | ----------- |
-| `-f` | No | Specify the input variable file, if it doesn't exist adds home directory
-| `-a` | Yes | Disables *dry_run* mode so that the changes are applied
-| `-nu` | Yes | By specifying an Orion username will use a dynamic rather than static inventory file
-| `-du` | Yes | Define all devices username (if not using env var) and prompt for a password at runtime |
+| flag           | Description |
+| -------------- | ----------- |
+| `-f` | Specify the input variable file, if it doesn't exist looks for it in home directory
+| `-a` | Disables *dry_run* mode so that the changes are applied
+| `-nu` | By specifying an Orion username uses dynamic orion inventory rather than a static inventory
+| `-du` | Define username for all devices (if not set in inv_settings.yml or env var) and prompt for a password at runtime
 
-The device credentials can be set in environment variables rather than at runtime (if username is set in both the runtime value will override this).
+The device credentials can be set in *inv_settings.yml* (only username) or environment variables rather than at runtime (if username is set in all the runtime value will overrides them).
 
 - `DEVICE_USERNAME`
 - `DEVICE_PASSWORD`
