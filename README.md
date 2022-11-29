@@ -99,12 +99,12 @@ First run the script in ***dry_run*** mode to print the templated configuration 
 
 | flag           | Description |
 | -------------- | ----------- |
-| `-f` | Specify the input variable file, if it doesn't exist looks for it in home directory
+| `-f` | Specify the input variable file, if it doesn't exist looks for it in the home directory
 | `-a` | Disables *dry_run* mode so that the changes are applied
-| `-nu` | By specifying an Orion username uses dynamic orion inventory rather than a static inventory
-| `-du` | Define username for all devices (if not set in inv_settings.yml or env var) and prompt for a password at runtime
+| `-nu` | By specifying an Orion username uses dynamic (orion) rather than static inventory
+| `-du` | Define username for all devices and prompt for a password at runtime
 
-The device credentials can be set in *inv_settings.yml* (only username) or environment variables rather than at runtime (if username is set in all the runtime value will overrides them).
+The device credentials can be set in *inv_settings.yml* (only username) or environment variables rather than at runtime. If the username is set in multipel places the runtime value will always override them.
 
 - `DEVICE_USERNAME`
 - `DEVICE_PASSWORD`
