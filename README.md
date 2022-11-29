@@ -114,11 +114,7 @@ $ python update_mgmt_acl.py -du test_user -g asa -f acl_input_data.yml -a
 
 To guard against locking oneself out of the devices (as changing the SSH ACL) once the ACL is applied the the connection to the device is kept open whilst a telnet on port 22 is done and the changes reverted if this fails. A further post-test validation is done on task completion using *nornir-validate* to produce a compliance report if the actual_state and desired_state do not match (only reports, does not revert the config).
 
-!!!!!!! NEED A VIDEO TO SHOW Operation !!!!!
-
--dry-run on IOS and ASA
--successful on IOS, run again  no change
--rollback on ASA 
+![example](https://user-images.githubusercontent.com/33333983/204497062-10c959cd-1d10-408e-946e-699a0922a4f2.gif)
 
 ## Unit testing
 
