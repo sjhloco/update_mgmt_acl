@@ -11,17 +11,17 @@ The idea behind this script is to apply SSH and SNMP management ACLs at scale ac
 
 ## Installation and Prerequisites
 
-Clone the repository and create a virtual environment.
+Clone the repository, *--recurse-submodules* is needed to also clone the repos *nornir_orion* and *nornir_validate* that are used by this project.
 
 ```bash
-git clone https://github.com/mgmt_acl_update
-python -m venv ~/venv/mgmt_acl_update
-source ~/venv/mgmt_acl_update/bin/activate
+git clone --recurse-submodules -j8 https://github.com/sjhloco/update_mgmt_acl.git
 ```
 
-Install the packages (nornir, rich, orionsdk, etc).
+Create a virtual environment and install the packages (nornir, rich, orionsdk, etc).
 
 ```bash
+python -m venv ~/venv/mgmt_acl_update
+source ~/venv/mgmt_acl_update/bin/activate
 pip install -r mgmt_acl_update/requirements.txt
 ```
 
