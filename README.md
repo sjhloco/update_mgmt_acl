@@ -46,7 +46,9 @@ acl:
 
 ## Templates
 
-The *nornir-template* plugin creates *device_type* specific configuration (based on group membership) from the input variable file and adds this as a data variable (called *config*) under the relevant Nornir inventory group. If there is a member of that group in the inventory the configuration is rendered once against the first member of that group (rather than for every member) and the result printed to screen. All the template configuration is in the one file with conditional rendering done based on the *os_type* (platform) variable within the template. At present the following device types (groups) are supported:
+The *nornir-template* plugin creates *device_type* specific configuration (based on group membership) from the input variable file and adds this as a data variable (called *config*) under the relevant Nornir inventory group. If there is a member of that group in the inventory the configuration is rendered once against the first member of that group (rather than for every member) and the result printed to screen. 
+
+The template sytnax for all device types is in the one file with conditional rendering done based on the *os_type* (platform) variable. At present the following device types (groups) are supported:
 
 | Groups | Jinja os_type | Information
 | ------------- | ----- | ------ |
