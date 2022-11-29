@@ -1,6 +1,6 @@
 # Network Device management (SSH, SNMP) ACL update
 
-The idea behind this script is to apply SSH and SNMP management ACLs at scale across different device types without fear of lockout.
+The idea behind this script is to apply SSH and SNMP management ACLs at scale across different device types without fear of locking yourself out.
 
 - Takes an input YAML file of variables for the ACLs such as name, permit/deny and source address
 - Only supports extended ACLs as [Cisco IOS changes the order of standard ACLs](https://community.cisco.com/t5/switching/access-list-wrong-order/td-p/3070419/highlight/true/page/2) which breaks the validation
