@@ -4,14 +4,14 @@ The idea behind this script is to apply SSH and SNMP management ACLs at scale ac
 
 - Takes an input YAML file of variables for the ACLs such as name, permit/deny and source address
 - Only supports extended ACLs as [Cisco IOS changes the order of standard ACLs](https://community.cisco.com/t5/switching/access-list-wrong-order/td-p/3070419/highlight/true/page/2) which breaks the validation
-- The SSH ACL must already exist on the devices. If it doesn't the script will only update the ACL, it will not be applied to the VTY lines
-- The inventory can be built manually or created dynamically from Solarwinds NPM with devices grouped by device type (*platform*). Runtime flags allow for filtering of the inventory based on these groups or solarwinds attributes of devices
-- Nornir-template builds the ACL configs based on device types (groups) allowing for multi-vendor device type configuration
-- After ACL application the configuration is validated (does not rollback, just reports) and SSH access tested before closing the SSH connection (rollback invoked if SSH fails)
+- The SSH ACL must already be assigned to the VTY lines, if not the ACL will only updated
+- The inventory can be defined manually or created dynamically (from Solarwinds NPM) with devices grouped by device type (*platform*). Runtime flags allow for filtering of the inventory based on these groups or device attributes
+- Nornir-template builds the ACL configs based on device types (*groups*) allowing for multi-vendor device type configuration
+- After ACL application the configuration is validated (just reports, does not rollback) and SSH access tested before closing the SSH connection (if SSH fails rollback is invoked)
 
 ## Installation and Prerequisites
 
-Clone the repository and create a virtual environment
+Clone the repository and create a virtual environment.
 
 ```bash
 git clone https://github.com/mgmt_acl_update
@@ -19,7 +19,7 @@ python -m venv ~/venv/mgmt_acl_update
 source ~/venv/mgmt_acl_update/bin/activate
 ```
 
-Install the packages (nornir, orionsdk, rich, etc)
+Install the packages (nornir, rich, orionsdk, etc).
 
 ```bash
 pip install -r mgmt_acl_update/requirements.txt
@@ -27,7 +27,7 @@ pip install -r mgmt_acl_update/requirements.txt
 
 ## Input File
 
-The input file is list of ACLs with each ACL having a name and an ACE list of dictionaries. The ACE dictionary keys are the permissions (*remark*, *permit* or *deny*) and the values the source addresses (*x.x.x.x* (will be /32), *x.x.x.x/x* or *any*). The destination is implicitly the device as the ACL is for SNMP or SSH access to the device the ACL is applied on.
+The input file is list of ACLs with each ACL having a name and an ACE list of dictionaries. The ACE dictionary keys are the permissions (*remark*, *permit* or *deny*) and the values the source addresses (*x.x.x.x* (a /32), *x.x.x.x/x* or *any*). The destination is implicitly the device as the ACL is for SNMP or SSH access to the device the ACL is applied on.
 
 ```yaml
 acl:
