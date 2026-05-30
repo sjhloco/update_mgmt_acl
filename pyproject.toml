@@ -7,8 +7,7 @@ requires-python = ">=3.14"
 dependencies = [
     "nornir>=3.5.0",
     "nornir-netmiko>=1.0.1",
-    "nornir-rich",
-    "nornir-validate>=0.3.2",
+    "nornir-validate>=0.4.1",
     "pyaml>=26.2.1",
 ]
 
@@ -73,6 +72,3 @@ convention = "google"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-
-[tool.uv.sources]
-nornir-rich = { git = "https://github.com/sjhloco/nornir_rich", branch = "per_panel_var" }
