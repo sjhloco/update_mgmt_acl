@@ -155,9 +155,10 @@ class InputValidate:
             self.rc.print(f":x: [b]AclError:[/b] {e}")
             exit(1)
         # Print any ACE errors and exit
+        exit_script = False
         for acl_type, err in errors.items():
-            exit_script = False
             if len(err) != 0:
+                exit_script = True
                 self.rc.print(
                     f":x: [b]AceError:[/b] [i]'{acl_type}'[/i] has the following ACE errors:"
                 )
@@ -216,9 +217,8 @@ class InputValidate:
                             wcard_ace.append(
                                 {list(each_ace.keys())[0]: ip + " " + wcard}
                             )
-                    except Exception as e:
-                        print(f"!! What is this exception '{e}' in 'format_acl_vars'")
-                        breakpoint()
+                    # Matches "any", is only valid non IP input, if not "any" then would have been caught in validation step
+                    except ipaddress.AddressValueError:
                         mask_ace.append(each_ace)
                         wcard_ace.append(each_ace)
             mask_acl_vars["acl"].append(dict(name=aclname, type=acl_type, ace=mask_ace))
