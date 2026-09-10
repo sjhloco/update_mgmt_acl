@@ -5,10 +5,10 @@ description = "Update SSH managment ACLs"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "nornir>=3.5.0",
+    "nornir>=3.6.0",
     "nornir-netmiko>=1.0.1",
-    "nornir-validate>=0.4.1",
-    "pyaml>=26.2.1",
+    "nornir-validate>=1.0.0",
+    "pyaml>=26.7.0",
 ]
 
 [dependency-groups]
